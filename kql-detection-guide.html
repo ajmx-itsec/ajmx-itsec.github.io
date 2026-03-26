@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KQL Detection Engineering Guide</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      padding: 32px 16px;
+      color: #1e293b;
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const pillars = [
+  {
+    id: "hypothesis", emoji: "🎯", color: "#6366f1", bg: "#eef2ff",
+    title: "1. Detection Hypothesis",
+    subtitle: "Define what you're hunting before writing a single line",
+    considerations: [
+      { title: "Threat-Led Design", detail: "Start from a threat scenario, not a log field. Ask: 'What would an attacker DO, and what log evidence would that leave?' Never start with 'let me look at this table.'" },
+      { title: "MITRE ATT&CK Mapping", detail: "Identify the exact Tactic + Technique (e.g., T1059.001 - PowerShell). This anchors scope, informs data sources, and prevents duplicate rules covering the same technique." },
+      { title: "Attacker Behavior, Not IOCs", detail: "Avoid building rules purely on IPs, hashes, or domains — they rotate. Build on TTPs: behavior patterns (e.g., LSASS memory access, base64 encoded commands) that persist across campaigns." },
+      { title: "Define the Hypothesis Statement", detail: "Write it out: 'An attacker performing [technique] would cause [data source] to log [specific event pattern].' This forces clarity and becomes your rule description." },
+      { title: "Identify Assumptions & Dependencies", detail: "What logging must be enabled? (e.g., PowerShell ScriptBlock logging, Sysmon Event ID 10). Document these as prerequisites — a rule is useless if its data source isn't active." },
+    ]
+  },
+  {
+    id: "datasource", emoji: "🗄️", color: "#0891b2", bg: "#ecfeff",
+    title: "2. Data Source Mastery",
+    subtitle: "Know your tables deeply before querying them",
+    considerations: [
+      { title: "Understand the Table Schema", detail: "Know which fields are populated, which are nullable, and which vary by OS/connector version. Run getschema TableName and spot-check real data before assuming field availability." },
+      { title: "Know the Ingestion Pipeline", detail: "Understand the path from endpoint → agent → connector → workspace. Each hop can introduce delay, field normalisation, or data loss. Factor this into time windows." },
+      { title: "Coverage vs. Completeness", detail: "Not every asset sends every log. Know your coverage gaps (e.g., only 70% of endpoints have Sysmon). A rule that only fires on instrumented assets needs that caveat documented." },
+      { title: "ASIM / Normalised Schemas", detail: "Prefer ASIM parsers (imProcessCreate, imNetworkSession) over raw tables where available. This makes rules portable across different vendor data sources." },
+      { title: "Event Volume Awareness", detail: "Know the approximate EPS (events per second) of tables you query. SecurityEvent can be millions/day. DeviceProcessEvents is high-volume. Design queries to handle that scale." },
+      { title: "Validate Actual Field Population", detail: "Many fields exist in schema but are rarely populated. Always validate: TableName | where isnotempty(FieldName) | summarize count() before depending on a field." },
+    ]
+  },
+  {
+    id: "querydesign", emoji: "⚙️", color: "#d97706", bg: "#fffbeb",
+    title: "3. Query Design Principles",
+    subtitle: "Write queries that are correct, efficient, and readable",
+    considerations: [
+      { title: "Filter Early, Filter Hard", detail: "Apply time filters (TimeGenerated) and high-selectivity where clauses first. Every row eliminated early reduces cost for downstream operators (join, summarize, mv-expand)." },
+      { title: "Avoid Broad String Matching", detail: "contains is slow and generates FPs. Prefer has (token-aware, indexed), startswith, or == for exact matches. Use =~ only when case-insensitivity is genuinely needed." },
+      { title: "Join Design", detail: "Always put the smaller table on the right side of a join. Use innerunique (default) cautiously — it deduplicates left side. Use kind=inner, leftouter, or leftsemi explicitly based on intent." },
+      { title: "Aggregation Before Alerting", detail: "Raw event-per-alert rules generate noise. Use summarize to group by entity (AccountName, DeviceName) within a time window and set a meaningful threshold before surfacing an alert." },
+      { title: "Use let for Readability", detail: "Break complex queries into named let blocks. One let per logical step — baseline, anomaly, enrichment. This makes peer review and future edits far easier." },
+      { title: "Project Only What You Need", detail: "Use project or project-away early in the pipeline to drop irrelevant columns. This reduces memory and improves performance on wide-schema tables like CommonSecurityLog." },
+      { title: "Avoid Dynamic Field Anti-patterns", detail: "Parsing JSON/XML inline with parse_json() on every row is expensive. Pre-parse only required fields, and index-optimise with has checks before extracting dynamic content." },
+    ]
+  },
+  {
+    id: "fidelity", emoji: "🎚️", color: "#16a34a", bg: "#f0fdf4",
+    title: "4. Signal Fidelity (TP vs FP Balance)",
+    subtitle: "A noisy rule is as useless as no rule",
+    considerations: [
+      { title: "Baseline Normal Behaviour First", detail: "Before writing a detection, run the same query without the alert condition for 30 days. Understand what 'normal' looks like for your environment — size, frequency, entities involved." },
+      { title: "Precision vs. Recall Trade-off", detail: "High precision = fewer FPs but may miss attacks (low recall). High recall = catches more attacks but noisy. Know which side to lean — critical assets may warrant lower precision thresholds." },
+      { title: "Environment-Specific Tuning", detail: "Generic rules from GitHub or vendor templates are starting points, not finished products. Every environment has unique software, naming conventions, and user behaviour that requires tuning." },
+      { title: "Exclusion Strategy", detail: "Exclusions should be dynamic (watchlists, functions) never hardcoded strings. Hardcoded exclusions rot silently — an old service account name can mask a real attack if re-used by an attacker." },
+      { title: "Anomaly vs. Threshold-Based", detail: "Threshold rules are brittle (magic numbers). Consider anomaly approaches: deviation from per-entity baselines (e.g., user sent 10x more emails than their 30-day average) for more resilient detections." },
+      { title: "Account for Legitimate Tools", detail: "LOLBins (certutil, mshta, wscript) are dual-use. Context is everything — enrich with parent process, command line args, user context, and network activity to separate malicious from benign." },
+    ]
+  },
+  {
+    id: "enrichment", emoji: "🔍", color: "#db2777", bg: "#fdf2f8",
+    title: "5. Alert Enrichment & Context",
+    subtitle: "Every alert should tell a story, not just show an event",
+    considerations: [
+      { title: "Entity Extraction", detail: "Always surface key entities: AccountName, UPN, DeviceName, IP, CommandLine, ParentProcess. These feed entity mapping, enable automated lookups, and speed up analyst triage." },
+      { title: "Risk Context Fields", detail: "Add fields that answer 'so what?': Is this account privileged? Is this device internet-facing? Is this IP geo-anomalous? Enrich at query time with watchlists or external data." },
+      { title: "Temporality Context", detail: "Include first seen / last seen for the behaviour, not just the triggering event. 'This account ran PowerShell for the first time in 90 days' is far more actionable than a raw process event." },
+      { title: "Linked Evidence", detail: "Where possible, surface corroborating evidence in the alert — related process tree events, prior logon events, or network connections in the same time window using join or union." },
+      { title: "Readable Alert Title & Description", detail: "Title format: [Severity] Technique — Entity (e.g., 'HIGH: LSASS Memory Access — DESKTOP-XYZ'). Description must explain the detection logic in plain English for Tier 1 analysts." },
+      { title: "Investigation Pointers", detail: "Include deep-links to related tables, suggested next queries, and runbook references in the custom details. Reduce time-to-triage from minutes to seconds." },
+    ]
+  },
+  {
+    id: "resilience", emoji: "🛡️", color: "#7c3aed", bg: "#f5f3ff",
+    title: "6. Resilience & Evasion Resistance",
+    subtitle: "Assume attackers will try to blind your detection",
+    considerations: [
+      { title: "Avoid Single-Point Detection", detail: "Never rely on one field or one event. Attackers know common detection fields (e.g., CommandLine). Layer detection across process, network, and file telemetry where possible." },
+      { title: "Case & Encoding Variants", detail: "Attackers use cAsE vArIaTiOn, base64 encoding, hex encoding, and string concatenation to bypass string matching. Use case-insensitive operators and consider decoding pipelines." },
+      { title: "Parent-Child Process Chains", detail: "Detecting powershell.exe alone is weak. Detecting winword.exe → powershell.exe is much stronger. Model the expected parent-child relationship to reduce evasion via process renaming." },
+      { title: "Rename & LOLBIN Evasion", detail: "Attackers rename binaries (e.g., renamed certutil.exe). Don't rely solely on process name — check OriginalFileName (from Sysmon) or hash-based identification to catch renames." },
+      { title: "Living off the Land Awareness", detail: "Built-in tools (wmic, mshta, regsvr32, rundll32) are intentionally abused because they're whitelisted. Detection must focus on unusual arguments, parent context, and network behaviour." },
+      { title: "Timestomping & Log Manipulation", detail: "Sophisticated actors may tamper with event logs. Consider cross-correlating across multiple log sources so that clearing one source doesn't blind the detection entirely." },
+    ]
+  },
+  {
+    id: "lifecycle", emoji: "🔄", color: "#0f766e", bg: "#f0fdfa",
+    title: "7. Rule Lifecycle Management",
+    subtitle: "A detection rule is a living artefact, not a one-time task",
+    considerations: [
+      { title: "Version Control Everything", detail: "Store rules in Git (YAML/JSON/ARM templates). Track who changed what and why. Every rule should have a changelog — especially exclusion additions, which can silently reduce coverage." },
+      { title: "Performance Monitoring", detail: "Monitor query execution time and cost in production. Tables grow, and a query that ran in 5s at day 1 may time out at 6 months. Set alerting on rule execution failures." },
+      { title: "False Positive Review Cycle", detail: "Schedule a monthly FP review. High-volume rules that analysts routinely close as FP erode trust and cause alert fatigue. Tune aggressively or retire rules that no longer add value." },
+      { title: "Threat Intelligence Refresh", detail: "TTPs evolve. A rule built for a 2022 technique variant may miss 2025 variants. Subscribe to threat intel feeds and schedule quarterly rule reviews against updated ATT&CK content." },
+      { title: "Coverage Gap Analysis", detail: "Regularly map your rule library to MITRE ATT&CK Navigator. Visualise blind spots. Prioritise new rule development based on threat actor profiles targeting your industry." },
+      { title: "Purple Team Validation", detail: "Rules should be regularly tested with red team simulations or atomic red team tests. If a rule doesn't fire during a controlled simulation, it won't fire in a real attack either." },
+    ]
+  },
+];
+
+function App() {
+  const [active, setActive] = React.useState("hypothesis");
+  const p = pillars.find(x => x.id === active);
+  const idx = pillars.findIndex(x => x.id === active);
+  const prev = pillars[idx - 1];
+  const next = pillars[idx + 1];
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto" }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display:"inline-block", background:"#1e293b", color:"#fff", fontSize:11, fontWeight:700, letterSpacing:"0.08em", padding:"3px 10px", borderRadius:999, marginBottom:10 }}>
+          DETECTION ENGINEERING FRAMEWORK
+        </div>
+        <h1 style={{ fontSize:22, fontWeight:800, letterSpacing:"-0.4px" }}>Creating Effective KQL Detection Rules</h1>
+        <p style={{ marginTop:6, fontSize:13.5, color:"#64748b", lineHeight:1.6 }}>
+          7 core pillars every detection engineer must master — from hypothesis to production lifecycle.
+        </p>
+      </div>
+
+      {/* Pillar Nav */}
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:24 }}>
+        {pillars.map(pl => (
+          <button key={pl.id} onClick={() => setActive(pl.id)} style={{
+            display:"flex", alignItems:"center", gap:6,
+            padding:"7px 14px", borderRadius:8, border:"2px solid",
+            borderColor: active===pl.id ? pl.color : "#e2e8f0",
+            background: active===pl.id ? pl.bg : "#fff",
+            cursor:"pointer", fontSize:13, fontWeight:600,
+            color: active===pl.id ? pl.color : "#64748b",
+          }}>
+            <span>{pl.emoji}</span>
+            <span style={{ fontSize:11, fontWeight:700, color: active===pl.id ? pl.color : "#94a3b8" }}>
+              {pl.title.split(".")[0]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Active Pillar Header */}
+      <div style={{ background:p.bg, border:`2px solid ${p.color}20`, borderRadius:12, padding:"18px 22px", marginBottom:16, display:"flex", alignItems:"center", gap:14 }}>
+        <div style={{ fontSize:36, lineHeight:1 }}>{p.emoji}</div>
+        <div>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:p.color }}>{p.title}</h2>
+          <p style={{ margin:"4px 0 0", fontSize:13, color:"#64748b" }}>{p.subtitle}</p>
+        </div>
+      </div>
+
+      {/* Consideration Cards */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        {p.considerations.map((c, i) => (
+          <div key={i} style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:10, padding:"16px 18px", boxShadow:"0 1px 3px rgba(0,0,0,0.05)", borderLeft:`4px solid ${p.color}` }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+              <div style={{ width:22, height:22, borderRadius:"50%", background:p.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800, color:p.color, flexShrink:0 }}>
+                {i+1}
+              </div>
+              <span style={{ fontWeight:700, fontSize:13.5, color:"#1e293b" }}>{c.title}</span>
+            </div>
+            <p style={{ margin:0, fontSize:13, color:"#475569", lineHeight:1.65 }}>{c.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Prev / Next Nav */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:20 }}>
+        <button onClick={() => prev && setActive(prev.id)} disabled={!prev} style={{
+          padding:"8px 16px", borderRadius:8, border:"1px solid #e2e8f0",
+          background: prev ? "#fff" : "#f8fafc", cursor: prev ? "pointer" : "not-allowed",
+          fontSize:13, color: prev ? "#334155" : "#cbd5e1", fontWeight:600
+        }}>
+          ← {prev ? prev.emoji + " " + prev.title.replace(/^\d+\. /,"") : "Start"}
+        </button>
+        <span style={{ fontSize:12, color:"#94a3b8" }}>{idx+1} / {pillars.length}</span>
+        <button onClick={() => next && setActive(next.id)} disabled={!next} style={{
+          padding:"8px 16px", borderRadius:8, border:"1px solid #e2e8f0",
+          background: next ? "#fff" : "#f8fafc", cursor: next ? "pointer" : "not-allowed",
+          fontSize:13, color: next ? "#334155" : "#cbd5e1", fontWeight:600
+        }}>
+          {next ? next.emoji + " " + next.title.replace(/^\d+\. /,"") : "End"} →
+        </button>
+      </div>
+
+      {/* Bottom Summary Strip */}
+      <div style={{ marginTop:28, background:"#1e293b", borderRadius:12, padding:"16px 22px", display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
+        {pillars.map(pl => (
+          <button key={pl.id} onClick={() => setActive(pl.id)} style={{
+            background: active===pl.id ? "#334155" : "transparent",
+            border:"none", cursor:"pointer", fontSize:11,
+            color: active===pl.id ? "#fff" : "#94a3b8",
+            fontWeight: active===pl.id ? 700 : 400,
+            display:"flex", flexDirection:"column", alignItems:"center",
+            gap:3, padding:"4px 10px", borderRadius:6
+          }}>
+            <span style={{ fontSize:20 }}>{pl.emoji}</span>
+            <span>{pl.title.replace(/^\d+\. /,"")}</span>
+          </button>
+        ))}
+      </div>
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

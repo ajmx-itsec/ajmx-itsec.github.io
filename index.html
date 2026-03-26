@@ -1,733 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>KQL Rule QA Checklist</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <title>My Resource Hub</title>
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4f8;min-height:100vh;padding:32px 16px;color:#1e293b}
-    pre{background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:8px;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre-wrap;word-break:break-word;font-family:'Cascadia Code','Fira Code','Consolas',monospace}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: #888;
+      margin-bottom: 50px;
+      text-align: center;
+    }
+
+    .section-label {
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      color: #555;
+      margin-bottom: 16px;
+      align-self: flex-start;
+      max-width: 560px;
+      width: 100%;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+      max-width: 560px;
+      width: 100%;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 22px 20px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.2s, transform 0.2s, background 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      border-color: #4f8ef7;
+      background: #1e2233;
+      transform: translateY(-2px);
+    }
+
+    .card .icon {
+      font-size: 1.6rem;
+    }
+
+    .card .title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .card .desc {
+      font-size: 0.82rem;
+      color: #777;
+      line-height: 1.4;
+    }
+
+    .card.coming-soon {
+      opacity: 0.4;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      background: #2a2d3a;
+      color: #888;
+      border-radius: 20px;
+      padding: 2px 9px;
+      margin-top: 4px;
+      width: fit-content;
+    }
+
+    .badge.new {
+      background: #1b3a2e;
+      color: #4caf82;
+    }
   </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
 
-const sections = [
-  {
-    id:"syntax", emoji:"🔤", title:"Syntax & Structure Validation",
-    items:[
-      {
-        text:"Query runs without parse errors in the target environment (Sentinel / ADX / Defender)",
-        explanation:"Always run the query interactively in your target workspace before saving the rule. A missing pipe, unclosed bracket, or wrong function name can silently produce zero results rather than an obvious error.",
-        example:`// Always test by running interactively first
-SecurityEvent
-| where TimeGenerated > ago(1d)
-| where EventID == 4625
-| summarize FailedLogins = count() by Account
-| where FailedLogins > 5`
-      },
-      {
-        text:"All operators are valid for the workspace KQL version",
-        explanation:"KQL feature availability differs between Azure Data Explorer, Sentinel, and Defender. For example, bag_unpack() and some scan operators may not be available in all workspaces. Test in the exact target environment.",
-        example:`// Check if a function is available in your workspace
-// If this errors, the function is unsupported here
-print test = format_ipv4("192.168.1.1", 24)
-// Expected output: "192.168.1.0"`
-      },
-      {
-        text:"Parentheses, brackets, and pipe operators are balanced and correctly ordered",
-        explanation:"Unbalanced parentheses silently alter logic. Use VSCode with the KQL extension for bracket matching, and always explicitly group AND/OR combinations.",
-        example:`// BAD: ambiguous logic - evaluated as (A and B) or C
-| where EventID == 4625 and Account contains "svc" or IpAddress == "1.2.3.4"
+  <h1>📂 Resource Hub</h1>
+  <p class="subtitle">Click a card to open the resource</p>
 
-// GOOD: explicit grouping
-| where (EventID == 4625 and Account contains "svc")
-     or (IpAddress == "1.2.3.4")`
-      },
-      {
-        text:"String literals use correct escaping (backslash, special chars)",
-        explanation:"Backslashes in Windows paths must be escaped with \\\\ or use the @ raw string prefix. Unescaped backslashes cause silent parse failures or wrong matches.",
-        example:`// BAD: single backslash breaks the string
-| where FolderPath startswith "C:\\Windows\\Temp"
+  <!-- Active Links -->
+  <div class="section-label">🟢 Available</div>
+  <div class="grid">
 
-// GOOD: use @ prefix for raw strings (recommended for paths)
-| where FolderPath startswith @"C:\\Windows\\Temp"
+    <a class="card" href="kql-detection-guide.html">
+      <div class="icon">🔍</div>
+      <div class="title">KQL Detection Guide</div>
+      <div class="desc">A comprehensive guide to writing KQL detection rules.</div>
+      <span class="badge new">● Available</span>
+    </a>
 
-// GOOD: double-escaped
-| where FolderPath startswith "C:\\\\Windows\\\\Temp"`
-      },
-      {
-        text:"All referenced table names exist and are spelled correctly",
-        explanation:"A mistyped table name returns zero results without throwing an obvious error. Use isfuzzy=true in a union to confirm table availability, or check the schema explorer before writing the rule.",
-        example:`// Check if table exists and has recent data
-let timeframe = 24h;
-union isfuzzy=true SecurityEvent, Syslog, CommonSecurityLog
-| summarize 
-    EventCount = countif(TimeGenerated >= ago(timeframe)),
-    LastSeen = max(TimeGenerated)
-    by Type
-| extend Status = case(
-    EventCount == 0, "No Recent Data",
-    LastSeen < ago(timeframe), "Stale",
-    "Healthy"
-)
-| order by Status asc`
-      },
-      {
-        text:"Field/column names match the actual schema (case-sensitive where applicable)",
-        explanation:"KQL column names are case-sensitive. AccountName vs accountName will return different results. Always validate field names with getschema before building logic around them.",
-        example:`// Inspect the actual schema of a table
-SecurityEvent
-| getschema`
-      },
-      {
-        text:"Time literals use correct format (e.g., 1h, 7d, datetime())",
-        explanation:"KQL timespan syntax is strict: 1h, 7d, 30m, 1d12h. Writing '1 hour' or '7 days' causes parse errors. For absolute times use datetime(2024-01-01).",
-        example:`// Valid timespan literals
-SecurityEvent
-| where TimeGenerated > ago(7d)          // 7 days ago
-| where TimeGenerated > ago(1h30m)       // 1 hour 30 minutes
-| where TimeGenerated between (
-    datetime(2024-01-01) .. datetime(2024-01-31)
-  )`
-      },
-    ]
-  },
-  {
-    id:"logic", emoji:"🧠", title:"Detection Logic Accuracy",
-    items:[
-      {
-        text:"Does the rule match the intended MITRE ATT&CK technique?",
-        explanation:"Ensuring the detection logic precisely aligns with the intended MITRE ATT&CK technique validates that the rule is detecting the behavior described in the hypothesis. Re‑read the hypothesis statement against every operator, filter, and condition in the query—small logic errors (for example, an incorrect join, operator, or exclusion) can unintentionally shift the detection to a different technique or tactic. To reinforce intent and support analyst review, document the hypothesis as a comment at the top of the query and validate that all query logic consistently supports that mapped technique."
-        // no example — intentionally omitted
-      },
-      {
-        text:"Are all required fields present (e.g., Account, DeviceName, CommandLine)?",
-        explanation:"Required fields such as Account, DeviceName, and CommandLine are essential for triage, investigation, and response. Missing or null fields reduce alert fidelity, limit analyst context, and can prevent accurate scoping, entity mapping, and MITRE ATT&CK alignment. Ensuring these fields are consistently populated confirms the rule produces actionable and operationally usable detections.",
-        example:`// Required fields present 
-DeviceProcessEvents
-| where TimeGenerated > ago(24h)
-| extend
-    Account = coalesce(AccountName, InitiatingProcessAccountName),
-    Hostname = DeviceName,
-    CommandLine = coalesce(ProcessCommandLine, InitiatingProcessCommandLine)
-| where isnotempty(Account) and isnotempty(Hostname) and isnotempty(CommandLine)
-| project TimeGenerated, Hostname, Account, CommandLine, FileName, FolderPath, ProcessId, InitiatingProcessFileName`
-      },
-      {
-        text:"Are field mappings correct for the data source? (e.g., SecurityEvent vs Sysmon vs MDE)",
-        explanation:"Different data sources (for example, SecurityEvent, Sysmon, and Microsoft Defender for Endpoint) use distinct schemas and field semantics. Incorrect field mappings can lead to broken logic, false negatives, or misinterpreted behavior could cause the rule to miss the intended activity or detect an entirely different one. Verifying that fields are correctly mapped for the specific data source ensures the detection logic accurately reflects the underlying telemetry and produces reliable, actionable alerts."
-        // no example — intentionally omitted
-      },
-      {
-        text:"Rule logic matches the written detection hypothesis / use-case description",
-        explanation:"Re-read your hypothesis statement against every line of the query. A single misplaced operator can flip detection intent. Write the hypothesis as a comment at the top of the query.",
-        example:`// HYPOTHESIS: Detect admin accounts authenticating outside business hours (8am-6pm)
-let timeframe = 1d;
-let business_start = 8;
-let business_end = 18;
-SecurityEvent
-| where TimeGenerated >=ago(timeframe)
-| where EventID == 4624                  // Successful logon
-| where AccountType =~ "User"
-| where Account !endswith "$"  // exclude machine accounts
-| where Account !in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE")
-| extend HourOfDay = hourofday(TimeGenerated)
-| where HourOfDay !between (business_start .. business_end)    // Outside business hours
-| project-reorder TimeGenerated
-| order by TimeGenerated desc`
-      },
-      {
-        text:"Boolean conditions (and / or / not) are grouped correctly with parentheses",
-        explanation:"KQL evaluates AND before OR (like most languages), but this is easy to misread. Always use explicit parentheses when mixing operators — it costs nothing and prevents silent logic bugs.",
-        example:`// Detect brute force OR access from known bad IP
-SecurityEvent
-| where EventID == 4625
-| where 
-    (AccountType =~ "User" and Account !endswith "$")
-    or
-    (ipv4_is_in_range(IpAddress, "185.220.0.0/16"))`
-      },
-      {
-        text:"Threshold values (counts, frequencies) are calibrated to realistic baselines",
-        explanation:"Magic number thresholds (e.g., > 5 failed logins) are guesses. Run the detection query without the threshold filter over 30 days and look at the distribution before picking a number.",
-        example:`// Step 1: Run without threshold to understand distribution
-SecurityEvent
-| where TimeGenerated > ago(30d)
-| where EventID == 4625
-| summarize FailCount = count() by Account, bin(TimeGenerated, 1h)
-| summarize
-    p50 = percentile(FailCount,50),
-    p90 = percentile(FailCount,90),
-    p99 = percentile(FailCount,99)
-// Use p99 as your threshold starting point`
-      },
-      {
-        text:"Comparison operators (==, !=, >, >=) are appropriate for the data type",
-        explanation:"Comparing a string field numerically (e.g., EventID > \"4624\") performs lexicographic comparison, not numeric. Always cast with toint() or tolong() before numeric comparisons.",
-        example:`// BAD: implicit string comparison (can break detection logic)
-| where EventID > "4624"
+    <a class="card" href="kql-checklist.html">
+      <div class="icon">✅</div>
+      <div class="title">KQL Checklist</div>
+      <div class="desc">Step-by-step checklist for KQL query review and validation.</div>
+      <span class="badge new">● Available</span>
+    </a>
 
-// GOOD: numeric comparison (correct logic)
-| where EventID == 4625
+  </div>
 
-// GOOD: defensive casting (recommended when schema is inconsistent)
-| where toint(EventID) between (4624 .. 4634)`
-      },
-      {
-        text:"Dynamic/array fields are handled with correct operators (has, in~, contains, mv-expand)",
-        explanation:"Dynamic (JSON/array) fields need mv-expand or indexing before filtering. Applying has directly to an unexpanded dynamic field often returns unexpected results.",
-        example:`// Expand a dynamic array field before filtering
-DeviceNetworkEvents
-| where TimeGenerated > ago(1d)
-| extend Ports = todynamic(RemotePort)
-| mv-expand Port = Ports
-| where toint(Port) in (445, 3389, 22, 1433)
-| summarize count() by DeviceName, RemoteIP`
-      },
-      {
-        text:"IP range checks use ipv4_is_in_range() or ipv6_is_in_range() — not string comparison",
-        explanation:"String-based IP checks (startswith '192.168') are unreliable and bypass-prone. Use the built-in CIDR range functions for accurate, evasion-resistant IP matching.",
-        example:`// BAD: string comparison is easily bypassed and inaccurate
-| where RemoteIP startswith "10."
+  <!-- Future Links -->
+  <div class="section-label">🔜 Coming Soon</div>
+  <div class="grid">
 
-// GOOD: proper CIDR range check
-DeviceNetworkEvents
-| where TimeGenerated > ago(1d)
-| where not(
-    ipv4_is_in_range(RemoteIP, "10.0.0.0/8") or
-    ipv4_is_in_range(RemoteIP, "172.16.0.0/12") or
-    ipv4_is_in_range(RemoteIP, "192.168.0.0/16")
-  )
-| where RemotePort in (443, 80, 8080)`
-      },
-      {
-        text:"Case-insensitive matching applied where needed (=~, in~, has_any, etc.)",
-        explanation:"== and has are case-sensitive. Attackers exploit this — 'PowerShell' vs 'powershell' vs 'POWERSHELL'. Use =~ and in~ for case-insensitive matching on user-controlled strings.",
-        example:`// BAD: misses case variations
-| where ProcessName == "powershell.exe"
-
-// GOOD: catches all case variants
-DeviceProcessEvents
-| where TimeGenerated > ago(1d)
-| where FileName =~ "powershell.exe"
-    or FileName in~ ("pwsh.exe", "powershell_ise.exe")
-| where ProcessCommandLine has_any ("-enc","-encodedcommand","-nop")`
-      },
-      {
-        text:"Negation logic (not in, !has) is tested for null/empty value side effects",
-        explanation:"| where Field != 'value' silently excludes rows where Field is null. If null rows should be included in a negative match, add an explicit isempty() check.",
-        example:`// BAD: excludes rows where SubjectUserName is null
-| where SubjectUserName != "SYSTEM"
-
-// GOOD: includes null/empty rows explicitly
-SecurityEvent
-| where TimeGenerated > ago(1d)
-| where EventID == 4624
-| where SubjectUserName !in ("SYSTEM", "NETWORK SERVICE", "LOCAL SERVICE")
-    or isempty(SubjectUserName)`
-      },
-      {
-        text:"Are regex patterns validated and not overly broad/narrow?",
-        explanation:"Regex is often the “last mile” of a detection, if it’s wrong, the entire rule can silently fail or flood you with noise. Validating regex (and ensuring it’s neither too broad nor too narrow) matters because it directly affects detection accuracy, operational load, and analyst trust.",
-        example:`// BAD: Regex too broad
-SecurityEvent
-| where ProcessCommandLine matches regex "(?i)powershell"
-
-// BAD: Regex too narrow
-SecurityEvent
-| where ProcessCommandLine matches regex "(?i)powershell.exe -enc aQBlAHgA"
-
-// GOOD: properly balanced Regex
-SecurityEvent
-| where ProcessCommandLine matches regex @"(?i)powershell(\.exe)?\s+.*(-enc|-encodedcommand)\s+[A-Za-z0-9+/=]{20,}"`
-      },
-      {
-        text:"Does the logic handle null/missing values safely?",
-        explanation:"Logs are often incomplete. Without safeguards, queries may break or skip relevant events. Handling null / empty / missing fields safely is critical because a single unexpected null can either break the detection, silently suppress true positives, or inflate false positives.",
-        example:`// Proper handling example
-SecurityEvent
-| where isnotempty(CommandLine)
-| where CommandLine contains "powershell"
-
-// OR
-| where coalesce(CommandLine, "") contains "powershell"
-
-// What coalesce is doing:
-// If CommandLine has a value → use it
-// If CommandLine is null → replace it with "" (empty string)
-// Without coalesce, If CommandLine = null the condition = false and the event is ignored`
-      },
-      {
-        text:"Null/empty field handling in place (isnotempty(), isnotnull(), coalesce())",
-        explanation:"Filtering or joining on a field that is frequently null causes silent result drops. Always validate field population and add null guards for critical fields.",
-        example:`// Guard against null in key fields
-DeviceProcessEvents
-| where TimeGenerated > ago(1d)
-| where isnotempty(ProcessCommandLine)
-| where isnotempty(AccountName)
-| extend SafeCommandLine = coalesce(ProcessCommandLine, tostring(ProcessId))
-| where ProcessCommandLine has "-enc"`
-      },
-    ]
-  },
-  {
-    id:"falsepositive", emoji:"🚫", title:"False Positive Control",
-    items:[
-      {
-        text:"Known benign processes, users, IPs, or domains are excluded with allowlists (whitelisting)",
-        explanation:"Allowlists remove recurring FPs from known-good sources. Keep them narrow and specific — over-broad exclusions create detection blind spots.",
-        example:`// Exclude known-good service accounts and admin tools
-let ExcludedAccounts = dynamic(["svc_backup","svc_monitor","svc_deploy"]);
-let ExcludedProcesses = dynamic(["msiexec.exe","sccmexec.exe","cylancesvc.exe"]);
-DeviceProcessEvents
-| where TimeGenerated > ago(1d)
-| where FileName =~ "powershell.exe"
-| where AccountName !in~ (ExcludedAccounts)
-| where InitiatingProcessFileName !in~ (ExcludedProcesses)`
-      },
-      {
-        text:"Allowlist/exclusion logic is parameterized (watchlist or function) — not hardcoded",
-        explanation:"Hardcoded exclusions in the query body are invisible to other analysts and silently stale. Use Sentinel Watchlists so exclusions can be updated without touching the rule itself.",
-        example:`// Pull exclusion list from a Sentinel Watchlist
-let AllowlistedIPs = (
-    _GetWatchlist('AllowlistedIPs')
-    | project SearchKey
-);
-DeviceNetworkEvents
-| where TimeGenerated > ago(1d)
-| where RemotePort == 3389
-| where RemoteIP !in (AllowlistedIPs)
-| where InitiatingProcessAccountName !endswith "$"`
-      },
-      {
-        text:"Rule does not trigger on scheduled tasks, known automation accounts, or service IPs",
-        explanation:"Automation processes often match detection patterns (e.g., scheduled PowerShell scripts, vulnerability scanners). Profile these and exclude them explicitly by source or parent process.",
-        example:`// Exclude known scanner and automation service accounts
-SecurityEvent
-| where TimeGenerated > ago(1d)
-| where EventID == 4625
-| where SubjectUserName !in~ ("nessus_svc","qualys_svc","tanium_svc")
-| where WorkstationName !startswith "SCANNER-"
-| where LogonType !in (4, 5)  // Exclude batch and service logon types`
-      },
-      {
-        text:"Aggregation (summarize / count) reduces per-event noise before alerting",
-        explanation:"Alerting on individual raw events generates one alert per log entry. Use summarize to group events by entity and time window, creating a single alert per incident pattern.",
-        example:`// BAD: one alert per failed login event (hundreds of alerts)
-SecurityEvent | where EventID == 4625
-
-// GOOD: one alert per account per hour, only if threshold breached
-SecurityEvent
-| where TimeGenerated > ago(1h)
-| where EventID == 4625
-| summarize
-    FailCount    = count(),
-    SourceIPs    = make_set(IpAddress, 10),
-    FirstAttempt = min(TimeGenerated)
-  by TargetAccount, bin(TimeGenerated, 1h)
-| where FailCount > 10`
-      },
-      {
-        text:"Deduplication applied where repeated events are expected (e.g., antivirus scans)",
-        explanation:"Certain events fire repeatedly for the same activity (e.g., AV scanning the same file). Use distinct or arg_max to keep only the most relevant occurrence.",
-        example:`// Deduplicate — keep only the most recent alert per device per file
-DeviceEvents
-| where TimeGenerated > ago(1d)
-| where ActionType == "AntivirusDetection"
-| summarize arg_max(TimeGenerated, *) by DeviceName, FileName
-| project TimeGenerated, DeviceName, FileName, ThreatName
-
-// The arg_max function is used to retrieve the most recent event per grouping key by selecting the 
-// row with the maximum timestamp. This is effective for deduplication and reducing alert noise, but 
-// it may suppress historical events, which should be considered depending on the detection objective.`
-      },
-      {
-        text:"Suppression window set appropriately to avoid alert storms - Sentinel Rule Settings (Outside KQL)",
-        explanation:"Without suppression, a single compromised account generating 500 failed logins creates 500 alerts. Set incident grouping to suppress re-alerts for the same entity within a defined window. These are configured in the Analytics Rule (UI or ARM template).",
-        example:`// In Sentinel rule settings (ARM template excerpt):
-// suppressionEnabled: true
-// suppressionDuration: PT1H   (suppress re-alert for 1 hour per entity)
-// groupingConfiguration:
-//   enabled: true
-//   groupByEntities: [Account]
-//   lookbackDuration: PT1H
-
-// In the query — ensure the alerting entity is consistent:
-SecurityEvent
-| where EventID == 4625
-| summarize FailCount=count() by TargetAccount
-| where FailCount > 10
-| extend AccountCustomEntity = TargetAccount`
-      },
-    ]
-  },
-  {
-    id:"performance", emoji:"⚡", title:"Performance & Efficiency",
-    items:[
-      {
-        text:"Time range filter applied as early as possible (TimeGenerated first)",
-        explanation:"TimeGenerated is the partition key for all Sentinel tables. Placing it first allows the engine to skip irrelevant data partitions entirely, dramatically reducing scan cost.",
-        example:`// BAD: time filter late in pipeline — full table scanned first
-SecurityEvent
-| where EventID == 4625
-| where Account contains "admin"
-| where TimeGenerated > ago(1d)   // ❌ too late
-
-// GOOD: time filter first — partition pruning kicks in
-SecurityEvent
-| where TimeGenerated > ago(1d)   // ✅ first
-| where EventID == 4625
-| where Account contains "admin"`
-      },
-      {
-        text:"where clauses placed before joins, projections, and summarize",
-        explanation:"Every row that reaches a join or summarize adds CPU and memory cost. Filter aggressively before these operators to minimize the working set size.",
-        example:`// GOOD: filter both sides before joining
-let FailedLogins = SecurityEvent
-    | where TimeGenerated > ago(1h)
-    | where EventID == 4625
-    | where AccountType =~ "User";
-let SuspectDevices = DeviceLogonEvents
-    | where TimeGenerated > ago(1h)
-    | where LogonType == "RemoteInteractive";
-FailedLogins
-| join kind=inner SuspectDevices on $left.Account == $right.AccountName`
-      },
-      {
-        text:"Large table joins use has/in for pre-filtering before join operator",
-        explanation:"The join operator is expensive. Pre-filter the left table with has or in before joining so fewer rows are passed to the join engine.",
-        example:`// Pre-filter with has_any before joining large tables
-let SuspectAccounts = SecurityEvent
-    | where TimeGenerated > ago(1d)
-    | where EventID == 4625
-    | summarize count() by Account
-    | where count_ > 10
-    | project Account;
-SigninLogs
-| where TimeGenerated > ago(1d)
-| where UserPrincipalName has_any (SuspectAccounts) // ✅ pre-filter
-| join kind=inner (SuspectAccounts) on $left.UserPrincipalName == $right.Account`
-      },
-      {
-        text:"No full-table scans without time-bounded filters",
-        explanation:"A query without a TimeGenerated filter scans the entire retention period (up to 2 years). Even a 90-day scan on a high-volume table costs significantly and will likely time out.",
-        example:`// GOOD: bound every table reference
-SecurityEvent
-| where TimeGenerated > ago(7d)  // ✅ required
-| join kind=inner (
-    AuditLogs
-    | where TimeGenerated > ago(7d)  // ✅ also bound the right side
-  ) on ...`
-      },
-      {
-        text:"project used to limit columns early — avoiding wide row carriage through pipeline",
-        explanation:"Wide tables (e.g., CommonSecurityLog has 60+ columns) carry significant memory overhead if all columns flow through the pipeline. Use project or project-keep early to drop what you don't need.",
-        example:`// GOOD: drop unused columns immediately
-CommonSecurityLog
-| where TimeGenerated > ago(1d)
-| where DeviceEventClassID == "threat"
-| project TimeGenerated, SourceIP, DestinationIP, Activity, DeviceVendor
-| summarize count() by SourceIP`
-      },
-      {
-        text:"No redundant let statements or repeated sub-queries — extracted to functions where possible",
-        explanation:"Repeating the same sub-query in multiple let blocks re-executes the scan each time. Extract reusable logic into a saved KQL function in your workspace.",
-        example:`// GOOD: define once, reference twice
-let FailedLogins = SecurityEvent
-    | where TimeGenerated > ago(1d)
-    | where EventID == 4625;
-let ByAccount = FailedLogins | summarize count() by Account;
-let ByIP      = FailedLogins | summarize count() by IpAddress;`
-      },
-      {
-        text:"Tested at peak ingestion volume — no timeout errors",
-        explanation:"Rules that pass performance tests on average-volume days can time out during peak ingestion (e.g., patch Tuesdays, incident response surges). Test against a high-volume day's data range.",
-        example:`// Find a peak volume day then test your rule against it
-SecurityEvent
-| where TimeGenerated between (datetime(2024-01-15) .. datetime(2024-01-16))
-| summarize EventsPerHour = count() by bin(TimeGenerated, 1h)
-| render timechart`
-      },
-      {
-        text:"Regex used only when necessary",
-        explanation:"Using regex only when necessary matters because regex is powerful but expensive, harder to maintain, and easier to misuse—overreliance can degrade performance, increase false positives, and introduce fragile logic where simpler operators would be more accurate and efficient.",
-        example:`// Rule-of-thumb: Use string operators (has, contains, startswith, endswith, in, has_any, has_all) whenever matching known tokens, and reserve regex for variable formats/obfuscation, optional spacing/quoting, or format validation.
-// Without regex (preferred)
-DeviceProcessEvents
-| where Timestamp > ago(1d)
-| extend cmd = tolower(coalesce(ProcessCommandLine, ""))
-| where cmd has "powershell" or cmd has "pwsh"
-| where cmd has_any ("-enc", "-encodedcommand", "-e ")
-
-// With regex (only if needed for obfuscation/formatting)
-DeviceProcessEvents
-| where Timestamp > ago(1d)
-| extend cmd = coalesce(ProcessCommandLine, "")
-| where cmd matches regex @"(?i)\\b(powershell|pwsh)(?:\\.exe)?\\b.*\\s-(?:enc|encodedcommand)\\b"`
-      },
-    ]
-  },
-  {
-    id:"alert", emoji:"🔔", title:"Alert Enrichment & Metadata",
-    items:[
-      {
-        text:"Query name or alert title is clear, actionable, and follows naming convention",
-        explanation:"The query name or alert title is clear, descriptive, and actionable, and follows established naming conventions. It accurately reflects the detection logic and intent, allowing SOC analysts to quickly understand the nature of the alert and prioritize investigation effectively."
-      },
-      {
-        text:"Author and Created date is accurately filled out in rule metadata",
-        explanation:"Ensuring the Author and Created date fields are correctly populated in detection rule metadata is essential for accountability, traceability, and long-term maintainability of security content."
-      },
-      {
-        text:"Alert description accurately states the detected activity.",
-        explanation:"A clear and accurate alert description is critical because it serves as the first point of understanding for analysts, guiding how quickly and correctly an alert is triaged and investigated."
-      },
-      {
-        text:"Severity and Priority are correctly set (Low / Medium / High / Critical)",
-        explanation:"Correctly assigning Severity and Priority ensures that security alerts are triaged, escalated, and responded to appropriately, aligning detection outcomes with actual risk and SOC response expectations."
-      },
-      {
-        text:"MITRE ATT&CK Tactic and Technique IDs are mapped and accurate",
-        explanation:"Accurate mapping of MITRE ATT&CK Tactic and Technique IDs is essential because it ensures that a detection rule is correctly aligned with adversary behavior, enabling effective threat understanding, prioritization, and response."
-      },
-      {
-        text:"Add references for the detection logic (blog posts, research papers, threat intel reports, mitre technique page, etc.)",
-        explanation:"Including credible references for detection logic is critical to establishing confidence, traceability, and technical justification for why a rule exists and how it aligns with real-world threats.",
-        example:`// =================================================================
-// Query Name: Cisco IOS TACACS PCAP Collection Activity
-// Author: Oliver Roca
-// Created: 2025-09-09
-// Description: This rule detects potentially suspicious network traffic collection from native tooling that is installed by default on CISCO IOS devices. This behavior has been previously observed in China-nexus APT actors that attempted to obtain privileged network admin credentials by examining TACACS+ network traffic, which is Cisco’s proprietary network access and authentication protocol. TACACS+ traffic by default goes through port 49.
-// Severity: High
-// Priority: High
-// MITRE ATT&CK:
-//   Tactic: TA0009 - Collection
-//   Technique: T1005 – Data from Local System
-// References: https://accenture-css.atlassian.net/wiki/spaces/CEDAR/pages/48597598304/MxDR+Base+Detection+Set+in+Chronicle#%F0%9F%93%9C-The-Alignment-w%2F-the-Cyber-Operational-Resilience-(CORe)-Framework 
-// =================================================================`
-      },
-      {
-        text:"Used approved ontology for project or summarize fields in the alert details for consistent entity naming",
-        explanation:"Using an approved ontology (standard field/entity naming) or summarizing key fields consistently in alert details matters because it ensures alerts are interpretable, searchable, correlatable, and automation-ready across the SOC, SIEM, and downstream workflows.",
-        example:`| project
-    vendor_name = DeviceVendor,
-    product_name = DeviceProduct,
-    source_host = Computer,
-    source_ip = SourceIP,
-    source_port = SourcePort,
-    dest_ip = DestinationIP,
-    dest_port = DestinationPort`
-      },
-    ]
-  },
-  {
-    id:"regression", emoji:"🔁", title:"Regression & Environment Testing",
-    items:[
-      {
-        text:"Rule tested in staging/dev workspace before production push",
-        explanation:"Production data volumes, schema versions, and connector configurations differ from dev. Always test in a staging workspace that mirrors production before promoting any rule.",
-        example:`// Validate rule against a representative sample in staging:
-SecurityEvent
-| where TimeGenerated > ago(1d)
-| sample 10000
-| where EventID == 4625
-| summarize count() by Account
-| where count_ > 5`
-      },
-      {
-        text:"Tested with known malicious samples / simulations",
-        explanation:"Testing a detection rule against known malicious samples, emulations, or simulations is critical to ensure the rule actually detects the behavior it claims to cover—not just that it “looks correct” on paper. Detection logic can be syntactically correct yet operationally ineffective. Validating it against known malware samples, red team simulations, or ATT&CK-aligned test cases confirms that the right fields are used, the logic triggers under realistic conditions, and the rule aligns with the stated hypothesis. Without validation, a rule may never fire in production, creating a false sense of security."
-        // no example — intentionally omitted
-      },
-      {
-        text:"Tested with benign data (false positive check)",
-        explanation:"Testing a detection rule against known benign data is essential to validate that the logic triggers only on malicious or suspicious behavior, not on normal system or user activity.  Excessive false positives overwhelm analysts, slow incident response, and increase the likelihood that real threats are ignored or auto-closed."
-        // no example — intentionally omitted
-      },
-      {
-        text:"Dependent watchlists, functions, or saved queries confirmed deployed first",
-        explanation:"If your rule calls _GetWatchlist() or a saved function that doesn't exist in the target workspace, the rule fails silently at runtime. Deploy all dependencies before the rule.",
-        example:`// Validate all watchlist dependencies exist before deploying rule:
-_GetWatchlist('HighRiskUsers') | count    // should return > 0
-_GetWatchlist('AllowlistedIPs') | count   // should return > 0`
-      },
-      {
-        text:"Produces expected number of alerts (not zero, not flood)",
-        explanation:"Validating that a detection rule produces an expected alert volume, neither zero nor excessive, it is critical to ensure that the rule is effective, reliable, and operationally sustainable.",
-        // no example — intentionally omitted
-      },
-    ]
-  },
-];
-
-function CodeBlock({ code }) {
-  const [copied, setCopied] = React.useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  };
-  return (
-    <div style={{ position:"relative", marginTop:8 }}>
-      <button onClick={copy} style={{
-        position:"absolute", top:8, right:8,
-        background: copied ? "#22c55e" : "#334155",
-        color:"#fff", border:"none", borderRadius:5,
-        fontSize:11, padding:"3px 10px", cursor:"pointer", fontWeight:600, zIndex:1
-      }}>
-        {copied ? "✓ Copied" : "Copy"}
-      </button>
-      <pre>{code}</pre>
+    <div class="card coming-soon">
+      <div class="icon">📄</div>
+      <div class="title">Future Link 1</div>
+      <div class="desc">Description coming soon.</div>
+      <span class="badge">Coming Soon</span>
     </div>
-  );
-}
 
-function App() {
-  const [checked, setChecked]     = React.useState({});
-  const [expanded, setExpanded]   = React.useState({});
-  const [collapsed, setCollapsed] = React.useState({});
-
-  const toggle    = (s,i) => { const k=`${s}-${i}`; setChecked(p=>({...p,[k]:!p[k]})); };
-  const toggleExp = (s,i) => { const k=`${s}-${i}`; setExpanded(p=>({...p,[k]:!p[k]})); };
-  const toggleSec = (id)  => setCollapsed(p=>({...p,[id]:!p[id]}));
-  const resetAll  = ()    => { setChecked({}); setExpanded({}); };
-
-  const totalItems   = sections.reduce((a,s)=>a+s.items.length,0);
-  const checkedCount = Object.values(checked).filter(Boolean).length;
-  const pct          = Math.round((checkedCount/totalItems)*100);
-  const barColor     = pct<40?"#ef4444":pct<70?"#f59e0b":pct<90?"#3b82f6":"#22c55e";
-  const statusEmoji  = pct===100?"✅":pct>=90?"🟢":pct>=70?"🔵":pct>=40?"🟡":"🔴";
-  const sProgress    = s => ({ done:s.items.filter((_,i)=>checked[`${s.id}-${i}`]).length, total:s.items.length });
-
-  return (
-    <div style={{ maxWidth:860, margin:"0 auto" }}>
-
-      {/* Header */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
-        <div>
-          <h1 style={{ fontSize:22, fontWeight:700, letterSpacing:"-0.3px" }}>KQL Analytics Rule — QA Checklist</h1>
-          <p style={{ marginTop:4, fontSize:13, color:"#64748b" }}>
-            Production Deployment Gate · {totalItems} checks · Click&nbsp;
-            <span style={{ background:"#e0f2fe", color:"#0369a1", padding:"1px 6px", borderRadius:4, fontWeight:700, fontSize:12 }}>ⓘ</span>
-            &nbsp;on any item for explanation + example            
-          </p>
-          <p style={{ marginTop:4, fontSize:13, color:"#64748b" }}>
-            <b>Developed by: Oliver A Roca</b><br/>
-            Last Updated: March 25, 2025      
-          </p>
-        </div>
-        <button onClick={resetAll} style={{ fontSize:12, padding:"6px 14px", border:"1px solid #e2e8f0", borderRadius:8, background:"#fff", cursor:"pointer", color:"#64748b", fontWeight:600 }}>
-          Reset All
-        </button>
-      </div>
-
-      {/* Progress */}
-      <div style={{ background:"#fff", borderRadius:12, padding:"16px 20px", marginBottom:20, boxShadow:"0 1px 4px rgba(0,0,0,0.07)", display:"flex", alignItems:"center", gap:20 }}>
-        <div style={{ flex:1 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-            <span style={{ fontSize:13, fontWeight:600, color:"#334155" }}>Overall Progress</span>
-            <span style={{ fontSize:13, fontWeight:700, color:barColor }}>{checkedCount} / {totalItems} ({pct}%)</span>
-          </div>
-          <div style={{ height:10, background:"#e2e8f0", borderRadius:999, overflow:"hidden" }}>
-            <div style={{ height:"100%", width:`${pct}%`, background:barColor, borderRadius:999, transition:"width 0.3s ease" }}/>
-          </div>
-        </div>
-        <div style={{ fontSize:28 }}>{statusEmoji}</div>
-      </div>
-
-      {/* Sections */}
-      {sections.map(section => {
-        const { done, total } = sProgress(section);
-        const isCollapsed = collapsed[section.id];
-        const allDone = done === total;
-
-        return (
-          <div key={section.id} style={{ border:`1px solid ${allDone?"#bbf7d0":"#e2e8f0"}`, borderRadius:10, marginBottom:10, overflow:"hidden", background:"#fff", boxShadow:"0 1px 3px rgba(0,0,0,0.05)" }}>
-            <button onClick={()=>toggleSec(section.id)} style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:allDone?"#f0fdf4":"#f8fafc", border:"none", cursor:"pointer", textAlign:"left" }}>
-              <span style={{ fontSize:18 }}>{section.emoji}</span>
-              <span style={{ flex:1, fontWeight:600, fontSize:14, color:"#1e293b" }}>{section.title}</span>
-              <span style={{ fontSize:12, color:allDone?"#16a34a":"#64748b", fontWeight:600, background:allDone?"#dcfce7":"#e2e8f0", padding:"2px 8px", borderRadius:999 }}>
-                {done}/{total}
-              </span>
-              <span style={{ fontSize:11, color:"#94a3b8", marginLeft:4 }}>{isCollapsed?"▶":"▼"}</span>
-            </button>
-
-            {!isCollapsed && (
-              <div style={{ padding:"4px 16px 12px" }}>
-                {section.items.map((item, i) => {
-                  const ck         = `${section.id}-${i}`;
-                  const isChecked  = !!checked[ck];
-                  const isExpanded = !!expanded[ck];
-                  const hasExample = !!item.example;
-
-                  return (
-                    <div key={i} style={{ borderBottom:"1px solid #f1f5f9", paddingBottom:4, marginBottom:4 }}>
-                      {/* Item row */}
-                      <div style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"6px 4px" }}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={()=>toggle(section.id,i)}
-                          style={{ marginTop:3, accentColor:"#3b82f6", width:15, height:15, flexShrink:0, cursor:"pointer" }}
-                        />
-                        <span style={{ flex:1, fontSize:13.5, lineHeight:1.55, color:isChecked?"#94a3b8":"#334155", textDecoration:isChecked?"line-through":"none" }}>
-                          {item.text}
-                        </span>
-                        <button
-                          onClick={()=>toggleExp(section.id,i)}
-                          title="Show explanation & example"
-                          style={{
-                            flexShrink:0, width:24, height:24, borderRadius:6,
-                            border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
-                            background: isExpanded ? "#0369a1" : "#e0f2fe",
-                            color:       isExpanded ? "#fff"    : "#0369a1",
-                            display:"flex", alignItems:"center", justifyContent:"center",
-                            transition:"all 0.15s"
-                          }}>
-                          ⓘ
-                        </button>
-                      </div>
-
-                      {/* Expanded panel — only show example block if item.example exists */}
-                      {isExpanded && (
-                        <div style={{ margin:"4px 34px 10px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"12px 14px" }}>
-                          <p style={{ fontSize:13, color:"#475569", lineHeight:1.7, marginBottom: hasExample ? 10 : 0 }}>
-                            💡 <strong style={{ color:"#1e293b" }}>Why it matters: </strong>{item.explanation}
-                          </p>
-                          {hasExample && (
-                            <>
-                              <div style={{ fontSize:12, fontWeight:700, color:"#64748b", marginBottom:4, letterSpacing:"0.06em" }}>
-                                📋 KQL EXAMPLE
-                              </div>
-                              <CodeBlock code={item.example}/>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:"#94a3b8" }}>
-        ✦ All {totalItems} checks must pass before promoting to production
-      </div>
+    <div class="card coming-soon">
+      <div class="icon">📄</div>
+      <div class="title">Future Link 2</div>
+      <div class="desc">Description coming soon.</div>
+      <span class="badge">Coming Soon</span>
     </div>
-  );
-}
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-</script>
+    <div class="card coming-soon">
+      <div class="icon">📄</div>
+      <div class="title">Future Link 3</div>
+      <div class="desc">Description coming soon.</div>
+      <span class="badge">Coming Soon</span>
+    </div>
+
+  </div>
+
 </body>
 </html>

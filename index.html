@@ -9,8 +9,8 @@
 
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #0f1117;
-      color: #e0e0e0;
+      background: #f0f4f8;
+      color: #2d3748;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -21,14 +21,14 @@
     h1 {
       font-size: 2rem;
       font-weight: 700;
-      color: #ffffff;
+      color: #1a202c;
       margin-bottom: 8px;
       text-align: center;
     }
 
     .subtitle {
       font-size: 0.95rem;
-      color: #888;
+      color: #718096;
       margin-bottom: 50px;
       text-align: center;
     }
@@ -37,7 +37,7 @@
       text-transform: uppercase;
       font-size: 0.72rem;
       letter-spacing: 2px;
-      color: #555;
+      color: #a0aec0;
       margin-bottom: 16px;
       align-self: flex-start;
       max-width: 560px;
@@ -54,13 +54,13 @@
     }
 
     .card {
-      background: #1a1d27;
-      border: 1px solid #2a2d3a;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
       border-radius: 12px;
       padding: 22px 20px;
       text-decoration: none;
       color: inherit;
-      transition: border-color 0.2s, transform 0.2s, background 0.2s;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -68,8 +68,8 @@
     }
 
     .card:hover {
-      border-color: #4f8ef7;
-      background: #1e2233;
+      border-color: #4a90d9;
+      box-shadow: 0 4px 16px rgba(74, 144, 217, 0.15);
       transform: translateY(-2px);
     }
 
@@ -80,26 +80,27 @@
     .card .title {
       font-size: 1rem;
       font-weight: 600;
-      color: #ffffff;
+      color: #1a202c;
     }
 
     .card .desc {
       font-size: 0.82rem;
-      color: #777;
+      color: #718096;
       line-height: 1.4;
     }
 
     .card.coming-soon {
-      opacity: 0.4;
+      opacity: 0.45;
       cursor: default;
       pointer-events: none;
+      background: #f7fafc;
     }
 
     .badge {
       display: inline-block;
       font-size: 0.65rem;
-      background: #2a2d3a;
-      color: #888;
+      background: #edf2f7;
+      color: #a0aec0;
       border-radius: 20px;
       padding: 2px 9px;
       margin-top: 4px;
@@ -107,8 +108,8 @@
     }
 
     .badge.new {
-      background: #1b3a2e;
-      color: #4caf82;
+      background: #e6f4ee;
+      color: #2f855a;
     }
   </style>
 </head>
